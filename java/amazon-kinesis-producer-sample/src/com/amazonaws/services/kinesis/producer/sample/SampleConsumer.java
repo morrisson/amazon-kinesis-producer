@@ -103,7 +103,7 @@ public class SampleConsumer implements IRecordProcessorFactory {
         @Override
         public void processRecords(List<Record> records, IRecordProcessorCheckpointer checkpointer) {
             long timestamp = 0;
-            List<Long> seqNos = new ArrayList<>();
+            // List<Long> seqNos = new ArrayList<>();
             
             for (Record r : records) {
                 // Get the timestamp of this run from the partition key.
@@ -116,7 +116,8 @@ public class SampleConsumer implements IRecordProcessorFactory {
                 try {
                     byte[] b = new byte[r.getData().remaining()];
                     r.getData().get(b);
-                    seqNos.add(Long.parseLong(new String(b, "UTF-8").split(" ")[0]));
+                    System.out.println(new String(b, "UTF-8"));
+                    // seqNos.add(Long.parseLong(new String(b, "UTF-8").split(" ")[0]));
                 } catch (Exception e) {
                     log.error("Error parsing record", e);
                     System.exit(1);
@@ -134,7 +135,7 @@ public class SampleConsumer implements IRecordProcessorFactory {
                 
                 // Only add to the shared list if our data is from the latest run.
                 if (largestTimestamp.get() == timestamp) {
-                    sequenceNumbers.addAll(seqNos);
+                    // sequenceNumbers.addAll(seqNos);
                     Collections.sort(sequenceNumbers);
                 }
             }

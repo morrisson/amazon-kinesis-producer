@@ -15,8 +15,10 @@
 
 package com.amazonaws.services.kinesis.producer.sample;
 
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.concurrent.Executors;
+import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -64,51 +66,55 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class SampleProducer {
     private static final Logger log = LoggerFactory.getLogger(SampleProducer.class);
-    
+
     private static final ScheduledExecutorService EXECUTOR = Executors.newScheduledThreadPool(1);
-    
+
     /**
      * Timestamp we'll attach to every record
      */
     private static final String TIMESTAMP = Long.toString(System.currentTimeMillis());
-    
-    /** The main method.
-     *  @param args  The command line args for the Sample Producer.
-     *  @see com.amazonaws.services.kinesis.producer.sample.SampleProducerConfig for positional arg ordering.
+
+    /**
+     * The main method.
+     * 
+     * @param args The command line args for the Sample Producer.
+     * @see com.amazonaws.services.kinesis.producer.sample.SampleProducerConfig for
+     *      positional arg ordering.
      */
     public static void main(String[] args) throws Exception {
         final SampleProducerConfig config = new SampleProducerConfig(args);
 
-        log.info(String.format("Stream name: %s Region: %s secondsToRun %d",config.getStreamName(), config.getRegion(),
+        log.info(String.format("Stream name: %s Region: %s secondsToRun %d", config.getStreamName(), config.getRegion(),
                 config.getSecondsToRun()));
-        log.info(String.format("Will attempt to run the KPL at %f MB/s...",(config.getDataSize() * config
-                .getRecordsPerSecond())/(1000000.0)));
+        log.info(String.format("Will attempt to run the KPL at %f MB/s...",
+                (config.getDataSize() * config.getRecordsPerSecond()) / (1000000.0)));
 
         final KinesisProducer producer = new KinesisProducer(config.transformToKinesisProducerConfiguration());
-        
-        // The monotonically increasing sequence number we will put in the data of each record
+
+        // The monotonically increasing sequence number we will put in the data of each
+        // record
         final AtomicLong sequenceNumber = new AtomicLong(0);
-        
+
         // The number of records that have finished (either successfully put, or failed)
         final AtomicLong completed = new AtomicLong(0);
-        
-        // KinesisProducer.addUserRecord is asynchronous. A callback can be used to receive the results.
+
+        // KinesisProducer.addUserRecord is asynchronous. A callback can be used to
+        // receive the results.
         final FutureCallback<UserRecordResult> callback = new FutureCallback<UserRecordResult>() {
             @Override
             public void onFailure(Throwable t) {
                 // If we see any failures, we will log them.
-                int attempts = ((UserRecordFailedException) t).getResult().getAttempts().size()-1;
+                int attempts = ((UserRecordFailedException) t).getResult().getAttempts().size() - 1;
                 if (t instanceof UserRecordFailedException) {
                     Attempt last = ((UserRecordFailedException) t).getResult().getAttempts().get(attempts);
-                    if(attempts > 1) {
+                    if (attempts > 1) {
                         Attempt previous = ((UserRecordFailedException) t).getResult().getAttempts().get(attempts - 1);
-                        log.error(String.format(
-                                "Record failed to put - %s : %s. Previous failure - %s : %s",
-                                last.getErrorCode(), last.getErrorMessage(), previous.getErrorCode(), previous.getErrorMessage()));
-                    }else{
-                        log.error(String.format(
-                                "Record failed to put - %s : %s.",
-                                last.getErrorCode(), last.getErrorMessage()));
+                        log.error(String.format("Record failed to put - %s : %s. Previous failure - %s : %s",
+                                last.getErrorCode(), last.getErrorMessage(), previous.getErrorCode(),
+                                previous.getErrorMessage()));
+                    } else {
+                        log.error(String.format("Record failed to put - %s : %s.", last.getErrorCode(),
+                                last.getErrorMessage()));
                     }
 
                 }
@@ -120,42 +126,52 @@ public class SampleProducer {
                 completed.getAndIncrement();
             }
         };
-        
+
         final ExecutorService callbackThreadPool = Executors.newCachedThreadPool();
+
+        final Scanner scan = new Scanner(System.in);
 
         // The lines within run() are the essence of the KPL API.
         final Runnable putOneRecord = new Runnable() {
             @Override
             public void run() {
-                ByteBuffer data = Utils.generateData(sequenceNumber.get(), config.getDataSize());
-                // TIMESTAMP is our partition key
-                ListenableFuture<UserRecordResult> f =
-                        producer.addUserRecord(config.getStreamName(), TIMESTAMP, Utils.randomExplicitHashKey(), data);
-                Futures.addCallback(f, callback, callbackThreadPool);
+                System.out.println("Input text...");
+                ByteBuffer data;
+                try {
+                    data = ByteBuffer.wrap(scan.nextLine().getBytes("UTF-8"));
+                    // TIMESTAMP is our partition key
+                    ListenableFuture<UserRecordResult> f =
+                            producer.addUserRecord(config.getStreamName(), TIMESTAMP, Utils.randomExplicitHashKey(), data);
+                    Futures.addCallback(f, callback, callbackThreadPool);
+                } catch (UnsupportedEncodingException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
             }
         };
         
         // This gives us progress updates
-        EXECUTOR.scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                long put = sequenceNumber.get();
-                long total = config.getRecordsPerSecond() * config.getSecondsToRun();
-                double putPercent = 100.0 * put / total;
-                long done = completed.get();
-                double donePercent = 100.0 * done / total;
-                log.info(String.format(
-                        "Put %d of %d so far (%.2f %%), %d have completed (%.2f %%)",
-                        put, total, putPercent, done, donePercent));
-            }
-        }, 1, 1, TimeUnit.SECONDS);
+        // EXECUTOR.scheduleAtFixedRate(new Runnable() {
+        //     @Override
+        //     public void run() {
+        //         long put = sequenceNumber.get();
+        //         long total = config.getRecordsPerSecond() * config.getSecondsToRun();
+        //         double putPercent = 100.0 * put / total;
+        //         long done = completed.get();
+        //         double donePercent = 100.0 * done / total;
+        //         log.info(String.format(
+        //                 "Put %d of %d so far (%.2f %%), %d have completed (%.2f %%)",
+        //                 put, total, putPercent, done, donePercent));
+        //     }
+        // }, 1, 1, TimeUnit.SECONDS);
         
         // Kick off the puts
         log.info(String.format(
                 "Starting puts... will run for %d seconds at %d records per second", config.getSecondsToRun(),
                 config.getRecordsPerSecond()));
-        executeAtTargetRate(EXECUTOR, putOneRecord, sequenceNumber, config.getSecondsToRun(),
-                config.getRecordsPerSecond());
+        executeByCount(putOneRecord, sequenceNumber, config.getRecordsPerSecond());
+        // executeAtTargetRate(EXECUTOR, putOneRecord, sequenceNumber, config.getSecondsToRun(),
+        //         config.getRecordsPerSecond());
         
         // Wait for puts to finish. After this statement returns, we have
         // finished all calls to putRecord, but the records may still be
@@ -176,6 +192,7 @@ public class SampleProducer {
         
         // This kills the child process and shuts down the threads managing it.
         producer.destroy();
+        scan.close();
         log.info("Finished.");
     }
 
@@ -210,15 +227,7 @@ public class SampleProducer {
                 double secondsRun = (System.nanoTime() - startTime) / 1e9;
                 double targetCount = Math.min(durationSeconds, secondsRun) * ratePerSecond;
                 
-                while (counter.get() < targetCount) {
-                    counter.getAndIncrement();
-                    try {
-                        task.run();
-                    } catch (Exception e) {
-                        log.error("Error running task", e);
-                        System.exit(1);
-                    }
-                }
+                executeByCount(task, counter, targetCount);
                 
                 if (secondsRun >= durationSeconds) {
                     exec.shutdown();
@@ -226,6 +235,17 @@ public class SampleProducer {
             }
         }, 0, 1, TimeUnit.MILLISECONDS);
     }
-    
 
+    private static void executeByCount(final Runnable task, final AtomicLong counter, final double count) {
+        while (counter.get() < count) {
+            counter.getAndIncrement();
+            try {
+                task.run();
+            } catch (Exception e) {
+                log.error("Error running task", e);
+                System.exit(1);
+            }
+        }
+    }
+    
 }
