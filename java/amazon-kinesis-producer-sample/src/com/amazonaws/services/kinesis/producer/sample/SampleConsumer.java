@@ -118,7 +118,7 @@ public class SampleConsumer implements IRecordProcessorFactory {
                     r.getData().get(b);
                     String msg = new String(b, "UTF-8");
                     seqNos.add(Long.parseLong(msg.split(" ")[0]));
-                    log.info("Acquired new message '%s'", msg);
+                    log.info(String.format("Acquired new message '%s'", msg));
                 } catch (Exception e) {
                     log.error("Error parsing record", e);
                     System.exit(1);
