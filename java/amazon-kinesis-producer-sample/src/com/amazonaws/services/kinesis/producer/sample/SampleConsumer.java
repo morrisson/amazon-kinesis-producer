@@ -214,12 +214,13 @@ public class SampleConsumer implements IRecordProcessorFactory {
         
         final SampleConsumer consumer = new SampleConsumer();
         
-        Executors.newScheduledThreadPool(1).scheduleAtFixedRate(new Runnable() {
-            @Override
-            public void run() {
-                consumer.logResults();
-            }
-        }, 10, 1, TimeUnit.SECONDS);
+        // NO NEED TO OUTPUT PERIODICAL REPORT
+        // Executors.newScheduledThreadPool(1).scheduleAtFixedRate(new Runnable() {
+        //     @Override
+        //     public void run() {
+        //         consumer.logResults();
+        //     }
+        // }, 10, 1, TimeUnit.SECONDS);
         
         new Worker.Builder()
             .recordProcessorFactory(consumer)
