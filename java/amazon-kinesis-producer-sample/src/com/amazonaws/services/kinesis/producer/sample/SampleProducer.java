@@ -123,6 +123,7 @@ public class SampleProducer {
 
             @Override
             public void onSuccess(UserRecordResult result) {
+                log.info(String.format("Success to input data. Seq no '%s'", result.getSequenceNumber()));
                 completed.getAndIncrement();
             }
         };
